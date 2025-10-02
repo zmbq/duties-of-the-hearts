@@ -1,0 +1,89 @@
+# Configuration for Duties of the Hearts Translation Project
+# This file contains non-sensitive settings
+
+# Application Settings
+app:
+  name: "Duties of the Hearts Translator"
+  version: "0.1.0"
+
+# Database Settings
+database:
+  # SQLite path (used if DATABASE_URL env var not set)
+  default_path: "duties_of_the_hearts.db"
+  # Echo SQL queries for debugging
+  echo: false
+
+# OpenAI Settings
+openai:
+  # Default model (can be overridden by OPENAI_MODEL env var)
+  default_model: "gpt-4"
+  # Temperature for translations (0.0 = deterministic, 1.0 = creative)
+  temperature: 0.3
+  # Max tokens per request
+  max_tokens: 2000
+  # Timeout in seconds
+  timeout: 60
+
+# Translation Prompts
+# You can define multiple prompts here and the system will store each translation separately
+prompts:
+  literal:
+    name: "literal"
+    description: "Direct literal translation from medieval to modern Hebrew"
+    system_prompt: |
+      You are an expert Hebrew translator specializing in medieval Jewish philosophical texts.
+      Translate the following medieval Hebrew text to clear, modern Hebrew.
+      Keep the translation as literal as possible while maintaining readability.
+      Preserve the original meaning and tone.
+    
+  modern:
+    name: "modern"
+    description: "More natural modern Hebrew translation"
+    system_prompt: |
+      You are an expert Hebrew translator specializing in medieval Jewish philosophical texts.
+      Translate the following medieval Hebrew text to natural, flowing modern Hebrew.
+      Make it accessible to contemporary readers while preserving the philosophical depth.
+      You may use modern idioms where appropriate.
+  
+  simplified:
+    name: "simplified"
+    description: "Simplified modern Hebrew for easier comprehension"
+    system_prompt: |
+      You are an expert Hebrew translator specializing in medieval Jewish philosophical texts.
+      Translate the following medieval Hebrew text to simplified modern Hebrew.
+      Use simple vocabulary and shorter sentences to make the text accessible.
+      Explain complex concepts in clearer terms while preserving the core meaning.
+
+# Document Export Settings
+export:
+  # Output directory for generated documents
+  output_dir: "output"
+  
+  # Document format (docx or pdf)
+  # Note: PDF generation requires additional dependencies
+  default_format: "docx"
+  
+  # Document styling
+  font:
+    name: "David"  # Good Hebrew font
+    size: 12
+    rtl: true  # Right-to-left text direction
+  
+  # Margins (in inches)
+  margins:
+    top: 1.0
+    bottom: 1.0
+    left: 1.0
+    right: 1.0
+
+# Pipeline Settings
+pipeline:
+  # Batch size for processing paragraphs
+  batch_size: 10
+  
+  # Delay between API calls (seconds) to avoid rate limits
+  api_delay: 1.0
+  
+  # Retry settings for failed API calls
+  max_retries: 3
+  retry_delay: 5.0
