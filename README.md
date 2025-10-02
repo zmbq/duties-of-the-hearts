@@ -55,7 +55,7 @@ The OpenAI API key is stored in a `.env` file that is **NOT** committed to git f
 Test that everything is configured correctly:
 
 ```powershell
-python -m src.utils
+python tests\test_config.py
 ```
 
 You should see output showing:
@@ -77,15 +77,19 @@ duties-of-the-hearts/
 │   ├── models/                      # Database models
 │   │   ├── __init__.py
 │   │   └── database.py             # SQLAlchemy models
-│   ├── pipeline/                    # Translation pipeline (TODO)
+│   ├── pipeline/                    # Translation pipeline
 │   │   ├── step1_import.py         # Import JSON to database
-│   │   ├── step2_translate.py      # Translate using OpenAI
-│   │   └── step3_export.py         # Export to DOCX
+│   │   ├── step2_translate.py      # Translate using OpenAI (TODO)
+│   │   └── step3_export.py         # Export to DOCX (TODO)
 │   ├── services/                    # Service layers (TODO)
 │   │   ├── llm_service.py          # OpenAI integration
 │   │   └── document_service.py     # Document generation
 │   └── utils/                       # Utilities
 │       └── __init__.py             # Configuration management
+├── tests/                           # Test scripts
+│   ├── test_config.py              # Configuration system tests
+│   ├── verify_import.py            # Database import verification
+│   └── test_clean_text.py          # HTML tag removal verification
 ├── output/                          # Generated documents (gitignored)
 ├── .env                            # YOUR API keys (gitignored, create from .env.example)
 ├── .env.example                    # Template for .env
@@ -162,12 +166,29 @@ python -m src.pipeline.step3_export --prompt literal --output "duties_literal.do
 - [x] Database models
 - [x] Configuration management
 - [x] Dependency installation
-- [ ] JSON import pipeline
+- [x] JSON import pipeline (Step 1 complete)
+- [x] HTML tag cleaning
+- [x] Hebrew title extraction from schema
 - [ ] OpenAI translation service
 - [ ] Document export
 - [ ] CLI interface
 - [ ] Error handling & retry logic
 - [ ] Progress tracking
+
+## Testing
+
+Run tests to verify the system:
+
+```powershell
+# Test configuration
+python -m tests.test_config
+
+# Verify database import
+python -m tests.verify_import
+
+# Check for clean text (no HTML tags)
+python -m tests.test_clean_text
+```
 
 ## Contributing
 
