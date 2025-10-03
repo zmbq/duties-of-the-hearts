@@ -175,7 +175,7 @@ class DocumentExporter:
         return table
     
     def _add_paragraph_row(self, table, para: Paragraph, translation: Translation):
-        """Add a row to the table with paragraph data."""
+        """Add a row to the table with paragraph data (used only when show_original=True)."""
         row = table.add_row()
         cells = row.cells
         
@@ -187,30 +187,44 @@ class DocumentExporter:
             run.font.size = Pt(10)
             run.font.color.rgb = RGBColor(128, 128, 128)  # Gray
         
-        if self.show_original:
-            # Original text
-            cells[1].text = self._fix_rtl_text(para.text)
-            orig_para = cells[1].paragraphs[0]
-            self._set_paragraph_rtl(orig_para)  # Set RTL
-            for run in orig_para.runs:
-                run.font.name = 'David'
-                run.font.size = Pt(11)
-            
-            # Translation
-            cells[2].text = self._fix_rtl_text(translation.translated_text)
-            trans_para = cells[2].paragraphs[0]
-            self._set_paragraph_rtl(trans_para)  # Set RTL
-            for run in trans_para.runs:
-                run.font.name = 'David'
-                run.font.size = Pt(11)
-        else:
-            # Translation only
-            cells[1].text = self._fix_rtl_text(translation.translated_text)
-            trans_para = cells[1].paragraphs[0]
-            self._set_paragraph_rtl(trans_para)  # Set RTL
-            for run in trans_para.runs:
-                run.font.name = 'David'
-                run.font.size = Pt(11)
+        # Original text
+        cells[1].text = self._fix_rtl_text(para.text)
+        orig_para = cells[1].paragraphs[0]
+        self._set_paragraph_rtl(orig_para)  # Set RTL
+        for run in orig_para.runs:
+            run.font.name = 'David'
+            run.font.size = Pt(11)
+        
+        # Translation
+        cells[2].text = self._fix_rtl_text(translation.translated_text)
+        trans_para = cells[2].paragraphs[0]
+        self._set_paragraph_rtl(trans_para)  # Set RTL
+        for run in trans_para.runs:
+            run.font.name = 'David'
+            run.font.size = Pt(11)
+    
+    def _add_flowing_paragraph(self, para: Paragraph, translation: Translation):
+        """Add a paragraph as flowing text without table (used when show_original=False)."""
+        # Create a single paragraph with superscript number at the beginning
+        text_para = self.doc.add_paragraph()
+        
+        # Add paragraph number in superscript at the beginning
+        num_run = text_para.add_run(f"[{para.paragraph_number}] ")
+        num_run.font.superscript = True
+        num_run.font.size = Pt(9)
+        num_run.font.color.rgb = RGBColor(128, 128, 128)  # Gray
+        num_run.font.name = 'David'
+        
+        # Add the translation text
+        text_run = text_para.add_run(self._fix_rtl_text(translation.translated_text))
+        text_run.font.name = 'David'
+        text_run.font.size = Pt(12)
+        
+        # Set RTL for the paragraph
+        self._set_paragraph_rtl(text_para)
+        
+        # Add spacing after paragraph
+        text_para.paragraph_format.space_after = Pt(6)
     
     def export_section(self, session, section: Section, include_heading: bool = True):
         """
@@ -231,30 +245,31 @@ class DocumentExporter:
         ).order_by(Paragraph.paragraph_number).all()
         
         if not paragraphs:
-            self.doc.add_paragraph("(אין פסקאות בסעיף זה)")
+            empty_para = self.doc.add_paragraph(self._fix_rtl_text("(אין פסקאות בסעיף זה)"))
+            self._set_paragraph_rtl(empty_para)
             return
         
-        # Create table
-        table = self._create_table_header()
-        
-        # Add rows
-        for para in paragraphs:
-            # Get translation
-            translation = session.query(Translation).filter(
-                Translation.paragraph_id == para.id,
-                Translation.prompt_name == self.prompt_name
-            ).first()
+        if self.show_original:
+            # Table format with original text
+            table = self._create_table_header()
             
-            if translation:
-                self._add_paragraph_row(table, para, translation)
-            else:
-                # No translation yet
-                row = table.add_row()
-                cells = row.cells
-                cells[0].text = str(para.paragraph_number)
-                cells[0].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+            # Add rows
+            for para in paragraphs:
+                # Get translation
+                translation = session.query(Translation).filter(
+                    Translation.paragraph_id == para.id,
+                    Translation.prompt_name == self.prompt_name
+                ).first()
                 
-                if self.show_original:
+                if translation:
+                    self._add_paragraph_row(table, para, translation)
+                else:
+                    # No translation yet
+                    row = table.add_row()
+                    cells = row.cells
+                    cells[0].text = str(para.paragraph_number)
+                    cells[0].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    
                     cells[1].text = self._fix_rtl_text(para.text)
                     orig_para = cells[1].paragraphs[0]
                     self._set_paragraph_rtl(orig_para)
@@ -268,17 +283,46 @@ class DocumentExporter:
                         run.font.italic = True
                         run.font.color.rgb = RGBColor(128, 128, 128)
                         run.font.name = 'David'
+            
+            # Add spacing after table
+            self.doc.add_paragraph()
+        else:
+            # Flowing text format (translation only)
+            for para in paragraphs:
+                # Get translation
+                translation = session.query(Translation).filter(
+                    Translation.paragraph_id == para.id,
+                    Translation.prompt_name == self.prompt_name
+                ).first()
+                
+                if translation:
+                    self._add_flowing_paragraph(para, translation)
                 else:
-                    cells[1].text = self._fix_rtl_text("(טרם תורגם)")
-                    untrans_para = cells[1].paragraphs[0]
-                    self._set_paragraph_rtl(untrans_para)
-                    for run in untrans_para.runs:
-                        run.font.italic = True
-                        run.font.color.rgb = RGBColor(128, 128, 128)
-                        run.font.name = 'David'
-        
-        # Add spacing after table
-        self.doc.add_paragraph()
+                    # No translation yet - show placeholder as simple paragraph
+                    text_para = self.doc.add_paragraph()
+                    
+                    # Add paragraph number in superscript at the beginning
+                    num_run = text_para.add_run(f"[{para.paragraph_number}] ")
+                    num_run.font.superscript = True
+                    num_run.font.size = Pt(9)
+                    num_run.font.color.rgb = RGBColor(128, 128, 128)
+                    num_run.font.name = 'David'
+                    
+                    # Add placeholder text
+                    text_run = text_para.add_run(self._fix_rtl_text("(טרם תורגם)"))
+                    text_run.font.name = 'David'
+                    text_run.font.size = Pt(12)
+                    text_run.font.italic = True
+                    text_run.font.color.rgb = RGBColor(128, 128, 128)
+                    
+                    # Set RTL for the paragraph
+                    self._set_paragraph_rtl(text_para)
+                    
+                    # Add spacing after paragraph
+                    text_para.paragraph_format.space_after = Pt(6)
+            
+            # Add spacing after section
+            self.doc.add_paragraph()
     
     def export_chapter(self, session, chapter: Chapter):
         """
@@ -306,6 +350,41 @@ class DocumentExporter:
                 ).order_by(Paragraph.paragraph_number).all()
                 
                 if paragraphs:
+                    if self.show_original:
+                        # Table format
+                        table = self._create_table_header()
+                        for para in paragraphs:
+                            translation = session.query(Translation).filter(
+                                Translation.paragraph_id == para.id,
+                                Translation.prompt_name == self.prompt_name
+                            ).first()
+                            
+                            if translation:
+                                self._add_paragraph_row(table, para, translation)
+                        
+                        self.doc.add_paragraph()
+                    else:
+                        # Flowing text format
+                        for para in paragraphs:
+                            translation = session.query(Translation).filter(
+                                Translation.paragraph_id == para.id,
+                                Translation.prompt_name == self.prompt_name
+                            ).first()
+                            
+                            if translation:
+                                self._add_flowing_paragraph(para, translation)
+                        
+                        self.doc.add_paragraph()
+        else:
+            # Chapter has no sections - direct paragraphs
+            paragraphs = session.query(Paragraph).filter(
+                Paragraph.chapter_id == chapter.id,
+                Paragraph.section_id == None
+            ).order_by(Paragraph.paragraph_number).all()
+            
+            if paragraphs:
+                if self.show_original:
+                    # Table format
                     table = self._create_table_header()
                     for para in paragraphs:
                         translation = session.query(Translation).filter(
@@ -317,29 +396,22 @@ class DocumentExporter:
                             self._add_paragraph_row(table, para, translation)
                     
                     self.doc.add_paragraph()
-        else:
-            # Chapter has no sections - direct paragraphs
-            paragraphs = session.query(Paragraph).filter(
-                Paragraph.chapter_id == chapter.id,
-                Paragraph.section_id == None
-            ).order_by(Paragraph.paragraph_number).all()
-            
-            if paragraphs:
-                table = self._create_table_header()
-                for para in paragraphs:
-                    translation = session.query(Translation).filter(
-                        Translation.paragraph_id == para.id,
-                        Translation.prompt_name == self.prompt_name
-                    ).first()
+                else:
+                    # Flowing text format
+                    for para in paragraphs:
+                        translation = session.query(Translation).filter(
+                            Translation.paragraph_id == para.id,
+                            Translation.prompt_name == self.prompt_name
+                        ).first()
+                        
+                        if translation:
+                            self._add_flowing_paragraph(para, translation)
                     
-                    if translation:
-                        self._add_paragraph_row(table, para, translation)
-                
-                self.doc.add_paragraph()
+                    self.doc.add_paragraph()
     
     def save(self, filename: Path):
         """Save the document to a file."""
-        self.doc.save(filename)
+        self.doc.save(str(filename))
         print(f"✓ Document saved: {filename}")
 
 
